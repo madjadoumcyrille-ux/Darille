@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nos Deux Cœurs ❤️ — Multijoueur</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#fff0f5,#ffe4ec);color:#4a2030;min-height:100vh;padding:18px}
+.app{width:min(650px,100%);margin:auto;background:#fff;border-radius:28px;padding:24px 18px;box-shadow:0 15px 45px #b85b7830}
+.heart{text-align:center;font-size:48px}
+h1{text-align:center;margin:5px 0}
+.sub{text-align:center;color:#8c6070;line-height:1.5}
+.panel{background:#fff5f8;border-radius:20px;padding:18px;margin-top:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input{flex:1;min-width:150px;border:2px solid #ffd1df;border-radius:14px;padding:13px;font-size:16px;outline:none}
+button{border:0;border-radius:16px;padding:14px 16px;background:#fff0f5;color:#a52f58;font-weight:700;font-size:15px;cursor:pointer}
+button:hover{transform:scale(1.02);background:#ffd9e5}
+.primary{background:#a52f58;color:#fff}
+.secondary{background:#f5d7e2}
+.status{text-align:center;margin:12px 0;font-weight:700}
+.hidden{display:none!important}
+#cards{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:16px}
+.cardBtn{padding:13px 5px}
+#question{margin-top:18px;padding:20px;border-radius:20px;background:#fff5f8;font-size:19px;line-height:1.5;font-weight:600}
+textarea{width:100%;min-height:120px;border:2px solid #ffd1df;border-radius:16px;padding:14px;font:inherit;resize:vertical;margin-top:12px}
+.answers{display:grid;gap:10px;margin-top:15px}
+.answer{background:#fff;border:2px solid #ffe0e9;border-radius:16px;padding:14px;text-align:left}
+.small{font-size:13px;color:#96707c;text-align:center;margin-top:18px}
+.roomcode{font-size:26px;letter-spacing:5px;font-weight:800;color:#a52f58;text-align:center}
+.badge{display:inline-block;background:#ffe1eb;color:#a52f58;border-radius:20px;padding:6px 10px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="heart">❤️</div>
+  <h1>Nos Deux Cœurs</h1>
+  <p class="sub">Le jeu romantique de <b>Karen</b>, <b>Darille</b> & <b>Cyrille</b> 💕<br>Répondez chacun à votre tour, même à distance.</p>
+
+  <div id="setup" class="panel">
+    <h2>1. Choisissez votre nom</h2>
+    <div class="row">
+      <input id="name" placeholder="Karen ou Cyrille" maxlength="20">
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" onclick="createRoom()">💞 Créer une partie</button>
+      <button onclick="showJoin()">🔗 Rejoindre</button>
+    </div>
+    <div id="joinBox" class="hidden" style="margin-top:14px">
+      <input id="roomInput" placeholder="Code de la partie (ex: ABC123)" maxlength="6">
+      <button class="primary" onclick="joinRoom()">Rejoindre la partie</button>
+    </div>
+    <p class="small">Un seul joueur crée la partie. L'autre utilise le même code.</p>
+  </div>
+
+  <div id="roomPanel" class="panel hidden">
+    <div class="badge">PARTIE PRIVÉE 💗</div>
+    <p>Partage ce code avec ton/ta partenaire :</p>
+    <div id="roomCode" class="roomcode">------</div>
+    <p id="connectionStatus" class="status">⏳ En attente de l'autre joueur...</p>
+    <button onclick="copyRoomCode()">📋 Copier le code</button>
+  </div>
+
+  <div id="game" class="hidden">
+    <div id="turnStatus" class="status"></div>
+    <div id="cards"></div>
+
+    <div id="question" class="hidden"></div>
+    <div id="answerBox" class="hidden">
+      <textarea id="answer" placeholder="Écris ta réponse ici... ❤️"></textarea>
+      <button class="primary" onclick="sendAnswer()">💌 Envoyer ma réponse</button>
+    </div>
+
+    <div id="waiting" class="panel hidden">
+      <div class="status">💗 Ta réponse est envoyée !</div>
+      <p>Attends que ton/ta partenaire réponde...</p>
+    </div>
+
+    <div id="answers" class="answers"></div>
+    <button id="nextBtn" class="primary hidden" onclick="nextQuestion()">💕 Question suivante</button>
+  </div>
+
+  <p class="small">Soyez sincères, doux et amoureux. 🥹❤️</p>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const questions=[
+"Quel est le premier souvenir de nous qui te fait encore sourire ?",
+"Qu’est-ce que tu aimes le plus chez moi ?",
+"À quel moment as-tu compris que tes sentiments pour moi étaient sérieux ?",
+"Quelle est la chose que tu rêves de faire avec moi un jour ?",
+"Qu’est-ce qui te manque le plus quand je suis loin de toi ?",
+"Si nous pouvions passer une journée ensemble maintenant, que ferions-nous ?",
+"Quelle qualité chez moi te rassure le plus ?",
+"Quelle chanson pourrait représenter notre histoire ?",
+"Quel surnom romantique aimerais-tu que je te donne ?",
+"Quelle est ta plus belle vision de notre avenir ?",
+"Qu’est-ce que tu voudrais qu’on améliore encore dans notre relation ?",
+"Quelle promesse aimerais-tu qu’on se fasse ?",
+"Quel endroit aimerais-tu visiter avec moi ?",
+"Qu’est-ce qui te fait te sentir vraiment aimé(e) par moi ?",
+"Quel moment avec moi voudrais-tu revivre ?",
+"Quelle petite chose que je fais te touche particulièrement ?",
+"Si tu devais décrire notre histoire en trois mots, lesquels choisirais-tu ?",
+"Quelle surprise romantique aimerais-tu recevoir de moi ?",
+"Qu’est-ce que tu admires le plus dans ma façon de penser ?",
+"Quel rêve aimerais-tu construire avec moi ?",
+"Comment imagines-tu notre première grande célébration ensemble ?",
+"Qu’est-ce qui te donne envie de continuer à croire en nous ?",
+"Quelle phrase de moi aimerais-tu toujours garder dans ton cœur ?",
+"Qu’aimerais-tu que je comprenne mieux sur toi ?",
+"Quel serait notre rendez-vous idéal ?",
+"Quelle photo de nous aimerais-tu avoir un jour ?",
+"Si Dieu nous permet de réaliser un grand projet ensemble, lequel choisirais-tu ?",
+"Qu’est-ce que tu voudrais me dire mais que tu n’oses pas toujours dire ?",
+"Quelle est la chose la plus importante pour protéger notre amour ?",
+"Termine cette phrase : « Je t’aime parce que… » ❤️"
+];
+
+let peer=null, conn=null, isHost=false, myName="", partnerName="Ton amour";
+let roomCode="", currentQuestion=-1, myAnswer=null, partnerAnswer=null, ready=false;
+
+const $=id=>document.getElementById(id);
+
+function showJoin(){ $("joinBox").classList.remove("hidden"); }
+
+function randomCode(){
+  return Math.random().toString(36).substring(2,8).toUpperCase();
+}
+
+function createRoom(){
+  myName=($("name").value.trim()||"Karen");
+  isHost=true;
+  roomCode=randomCode();
+  $("roomCode").textContent=roomCode;
+  $("setup").classList.add("hidden");
+  $("roomPanel").classList.remove("hidden");
+  $("connectionStatus").textContent="⏳ En attente de "+(myName.toLowerCase()==="karen"?"Cyrille":"Karen")+"...";
+  peer=new Peer("love-" + roomCode.toLowerCase());
+  peer.on("open",()=>{});
+  peer.on("connection",c=>setupConnection(c));
+  peer.on("error",e=>{$("connectionStatus").textContent="❌ Erreur de connexion. Recharge et recrée une partie."; console.error(e);});
+}
+
+function joinRoom(){
+  myName=($("name").value.trim()||"Cyrille");
+  roomCode=$("roomInput").value.trim().toUpperCase();
+  if(!roomCode){alert("Entre le code de la partie.");return;}
+  isHost=false;
+  $("setup").classList.add("hidden");
+  $("roomPanel").classList.remove("hidden");
+  $("roomCode").textContent=roomCode;
+  $("connectionStatus").textContent="🔄 Connexion à la partie...";
+  peer=new Peer();
+  peer.on("open",()=>setupConnection(peer.connect("love-"+roomCode.toLowerCase())));
+  peer.on("error",e=>{$("connectionStatus").textContent="❌ Code incorrect ou partie introuvable."; console.error(e);});
+}
+
+function setupConnection(c){
+  conn=c;
+  conn.on("open",()=>{
+    $("connectionStatus").textContent="💚 Connectés ! Vous pouvez commencer.";
+    conn.send({type:"hello",name:myName});
+    $("game").classList.remove("hidden");
+    if(isHost) renderCards();
+  });
+  conn.on("data",handleMessage);
+  conn.on("close",()=>{$("connectionStatus").textContent="🔴 Partenaire déconnecté";});
+}
+
+function handleMessage(m){
+  if(m.type==="hello"){
+    partnerName=m.name||"Ton amour";
+    if(isHost){
+      $("game").classList.remove("hidden");
+      renderCards();
+    }
+    $("connectionStatus").textContent="💚 "+partnerName+" est connecté(e) !";
+  }
+  if(m.type==="question"){
+    currentQuestion=m.index;
+    myAnswer=null; partnerAnswer=null;
+    renderQuestion();
+  }
+  if(m.type==="answer"){
+    partnerAnswer=m.answer;
+    renderAnswers();
+    checkBoth();
+  }
+  if(m.type==="next"){
+    currentQuestion=m.index;
+    myAnswer=null; partnerAnswer=null;
+    renderQuestion();
+  }
+}
+
+function renderCards(){
+  const cards=$("cards");
+  cards.innerHTML="";
+  questions.forEach((text,i)=>{
+    const b=document.createElement("button");
+    b.className="cardBtn";
+    b.textContent="💗 "+(i+1);
+    b.onclick=()=>startQuestion(i);
+    cards.appendChild(b);
+  });
+  $("turnStatus").textContent="Choisis une carte pour vous deux 💕";
+}
+
+function startQuestion(i){
+  if(!conn || !conn.open){alert("Attends que ton/ta partenaire soit connecté(e).");return;}
+  currentQuestion=i; myAnswer=null; partnerAnswer=null;
+  conn.send({type:"question",index:i});
+  renderQuestion();
+}
+
+function renderQuestion(){
+  $("cards").classList.add("hidden");
+  $("question").classList.remove("hidden");
+  $("question").textContent="❤️ Question "+(currentQuestion+1)+" : "+questions[currentQuestion];
+  $("answerBox").classList.remove("hidden");
+  $("waiting").classList.add("hidden");
+  $("answers").innerHTML="";
+  $("nextBtn").classList.add("hidden");
+  $("answer").value="";
+  $("turnStatus").textContent="Réponds sincèrement, "+myName+" 💕";
+}
+
+function sendAnswer(){
+  const text=$("answer").value.trim();
+  if(!text){alert("Écris une réponse avant d'envoyer ❤️");return;}
+  myAnswer=text;
+  conn.send({type:"answer",answer:text});
+  $("answerBox").classList.add("hidden");
+  $("waiting").classList.remove("hidden");
+  renderAnswers();
+  checkBoth();
+}
+
+function renderAnswers(){
+  const box=$("answers");
+  box.innerHTML="";
+  if(myAnswer) box.innerHTML+=`<div class="answer"><b>❤️ ${escapeHtml(myName)}</b><br>${escapeHtml(myAnswer)}</div>`;
+  if(partnerAnswer) box.innerHTML+=`<div class="answer"><b>💗 ${escapeHtml(partnerName)}</b><br>${escapeHtml(partnerAnswer)}</div>`;
+}
+
+function checkBoth(){
+  if(myAnswer && partnerAnswer){
+    $("waiting").classList.add("hidden");
+    $("turnStatus").textContent="🥹 Vos deux réponses sont là !";
+    $("nextBtn").classList.remove("hidden");
+  }
+}
+
+function nextQuestion(){
+  const next=(currentQuestion+1)%questions.length;
+  myAnswer=null; partnerAnswer=null;
+  conn.send({type:"next",index:next});
+  currentQuestion=next;
+  renderQuestion();
+}
+
+function copyRoomCode(){
+  navigator.clipboard?.writeText(roomCode);
+  alert("Code copié : "+roomCode+" ❤️");
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+</script>
+</body>
+</html>
